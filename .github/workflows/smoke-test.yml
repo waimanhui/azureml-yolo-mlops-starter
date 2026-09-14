@@ -1,0 +1,96 @@
+name: Run Azure ML Smoke Test
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: yolo-azureml-smoke-test
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AZURE_CORE_ONLY_SHOW_ERRORS: "true"
+  AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+  AZURE_ML_WORKSPACE: ${{ vars.AZURE_ML_WORKSPACE }}
+  AZURE_ML_EXTENSION_VERSION: ${{ vars.AZURE_ML_EXTENSION_VERSION }}
+  CPU_COMPUTE_NAME: ${{ vars.YOLO_CPU_COMPUTE_NAME || 'yolo-batch-cpu' }}
+
+jobs:
+  smoke:
+    name: Train YOLO on COCO8
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    environment: training
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Validate workflow configuration
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test -f azureml/jobs/coco8-smoke.yml
+          test -n "$AZURE_RESOURCE_GROUP"
+          test -n "$AZURE_ML_WORKSPACE"
+          test -n "$AZURE_ML_EXTENSION_VERSION"
+          test -n "$CPU_COMPUTE_NAME"
+
+      - name: Sign in to Azure with OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Submit and monitor smoke test
+        id: smoke
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          az extension add \
+            --name ml \
+            --version "$AZURE_ML_EXTENSION_VERSION" \
+            --upgrade \
+            --yes
+
+          job_name=$(az ml job create \
+            --file azureml/jobs/coco8-smoke.yml \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --workspace-name "$AZURE_ML_WORKSPACE" \
+            --set compute="azureml:$CPU_COMPUTE_NAME" \
+            --query name \
+            --output tsv)
+
+          echo "job_name=$job_name" >> "$GITHUB_OUTPUT"
+          az ml job stream \
+            --name "$job_name" \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --workspace-name "$AZURE_ML_WORKSPACE"
+
+          status=$(az ml job show \
+            --name "$job_name" \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --workspace-name "$AZURE_ML_WORKSPACE" \
+            --query status \
+            --output tsv)
+          test "$status" = "Completed"
+
+      - name: Write job summary
+        if: always() && steps.smoke.outputs.job_name != ''
+        env:
+          JOB_NAME: ${{ steps.smoke.outputs.job_name }}
+          SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+        shell: bash
+        run: |
+          job_url="https://ml.azure.com/runs/$JOB_NAME?wsid=/subscriptions/$SUBSCRIPTION_ID/resourcegroups/$AZURE_RESOURCE_GROUP/workspaces/$AZURE_ML_WORKSPACE"
+          {
+            echo "## Azure ML smoke test"
+            echo
+            echo "- Job: \`$JOB_NAME\`"
+            echo "- [Open in Azure ML Studio]($job_url)"
+          } >> "$GITHUB_STEP_SUMMARY"

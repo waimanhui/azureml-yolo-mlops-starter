@@ -254,6 +254,17 @@ $job = az ml job create `
 az ml job stream --name $job
 ```
 
+After configuring the GitHub variables in section 7, run the same managed test
+through GitHub Actions:
+
+```powershell
+gh workflow run smoke-test.yml --ref main
+gh run watch --workflow smoke-test.yml --exit-status
+```
+
+The workflow uses the `training` environment and OIDC identity, submits the job
+to `YOLO_CPU_COMPUTE_NAME`, and links the completed Azure ML job in its summary.
+
 Register the resulting file only if you need to test deployment:
 
 ```powershell
