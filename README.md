@@ -218,6 +218,11 @@ The checked-in defaults are:
 | CPU smoke and batch | `Standard_D2a_v4` | 0-1 | 120 seconds |
 | GPU training | `Standard_NV12s_v3` | 0-1 | 120 seconds |
 
+`Standard_NV12s_v3` uses an NVIDIA Tesla M60 (Maxwell). The production job pins
+Ultralytics 8.3.0 with PyTorch 2.3.1 and CUDA 12.1 because current Ultralytics
+GPU images use CUDA 13, which no longer supports Maxwell GPUs. Keep this
+compatibility constraint in mind when updating the production image.
+
 Create only the CPU cluster first. The names below are defaults and can be
 changed in the YAML or overridden by the documented GitHub variables:
 
@@ -727,6 +732,11 @@ az ml batch-endpoint delete --name yolo-batch --yes
 
 **`ClusterMinNodesExceedCoreQuota`**: request Azure ML quota in the workspace
 region for the exact VM family shown in the error.
+
+**`Invalid CUDA 'device=0' requested`**: confirm the job image supports both the
+GPU architecture and the host driver. The checked-in `Standard_NV12s_v3`
+configuration requires the CUDA 12.1 image pinned in `azureml/jobs/train.yml`;
+current CUDA 13 Ultralytics images do not support its Maxwell GPU.
 
 **`AuthorizationPermissionMismatch`**: verify Azure role assignments and storage
 network access for both the submitting identity and Azure ML managed identity.

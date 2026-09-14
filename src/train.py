@@ -2,8 +2,6 @@ import argparse
 import shutil
 from pathlib import Path
 
-from ultralytics import YOLO
-
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
@@ -17,8 +15,27 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def validate_device(device: str) -> None:
+    if device.strip().lower() == "cpu":
+        return
+
+    import torch
+
+    if not torch.cuda.is_available():
+        raise RuntimeError(
+            f"CUDA device {device!r} was requested but CUDA is unavailable "
+            f"(PyTorch {torch.__version__}, runtime {torch.version.cuda}, "
+            f"visible devices {torch.cuda.device_count()}). Check that the "
+            "container CUDA version supports the compute GPU and host driver."
+        )
+
+
 def main() -> None:
     args = parse_args()
+    validate_device(args.device)
+
+    from ultralytics import YOLO
+
     output_dir = Path(args.model_output)
     run_dir = output_dir / "training"
     output_dir.mkdir(parents=True, exist_ok=True)

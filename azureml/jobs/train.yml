@@ -5,7 +5,7 @@ experiment_name: yolo-retraining
 compute: azureml:yolo-gpu-cluster
 code: ../..
 environment:
-  image: ultralytics/ultralytics@sha256:5d797311857ea3d98c24ed0f7f78d27902b72ea5fdec93307f63634988abd131
+  image: ultralytics/ultralytics@sha256:a178a2eb438450fe2e2378dd1db91a0bdb8a7b7c4281de0be6451f4e42f04c06
 inputs:
   training_data:
     type: uri_folder
