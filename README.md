@@ -432,7 +432,7 @@ where the workflows that use them can access them:
 | `YOLO_STORAGE_ACCOUNT_NAME` | Existing storage account receiving dataset snapshots |
 | `YOLO_STORAGE_CONTAINER_NAME` | Optional container; defaults to `yolo-training` |
 | `YOLO_STORAGE_PREFIX` | Optional marker prefix; defaults to `continuous-training` |
-| `YOLO_AML_DATASTORE_NAME` | Optional datastore; defaults to `yolo-continuous-training` |
+| `YOLO_AML_DATASTORE_NAME` | Optional datastore; defaults to `yolo_continuous_training` |
 | `YOLO_DATA_ASSET_NAME` | Optional data asset; defaults to `yolo-training-data` |
 | `YOLO_MODEL_NAME` | Optional model name; defaults to `yolo-detector` |
 | `YOLO_TEST_MODEL_NAME` | Optional isolated test model; defaults to `<YOLO_MODEL_NAME>-test` |

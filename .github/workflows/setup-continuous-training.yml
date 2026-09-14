@@ -19,7 +19,7 @@ env:
   AZURE_CLIENT_OBJECT_ID: ${{ vars.AZURE_CLIENT_OBJECT_ID }}
   STORAGE_ACCOUNT_NAME: ${{ vars.YOLO_STORAGE_ACCOUNT_NAME }}
   STORAGE_CONTAINER_NAME: ${{ vars.YOLO_STORAGE_CONTAINER_NAME || 'yolo-training' }}
-  AML_DATASTORE_NAME: ${{ vars.YOLO_AML_DATASTORE_NAME || 'yolo-continuous-training' }}
+  AML_DATASTORE_NAME: ${{ vars.YOLO_AML_DATASTORE_NAME || 'yolo_continuous_training' }}
 
 jobs:
   setup:

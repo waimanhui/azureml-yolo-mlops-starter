@@ -1,5 +1,6 @@
 import ast
 import json
+import re
 from pathlib import Path
 
 import nbformat
@@ -14,6 +15,13 @@ def test_yaml_files_parse() -> None:
     assert yaml_files
     for yaml_file in yaml_files:
         yaml.safe_load(yaml_file.read_text(encoding="utf-8"))
+
+
+def test_datastore_name_uses_supported_characters() -> None:
+    datastore_path = REPOSITORY_ROOT / "azureml/datastores/continuous-training.yml"
+    datastore = yaml.safe_load(datastore_path.read_text(encoding="utf-8"))
+
+    assert re.fullmatch(r"[A-Za-z0-9_]+", datastore["name"])
 
 
 def test_notebook_structure_and_python_syntax() -> None:

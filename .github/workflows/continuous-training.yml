@@ -36,7 +36,7 @@ env:
   STORAGE_ACCOUNT_NAME: ${{ vars.YOLO_STORAGE_ACCOUNT_NAME }}
   STORAGE_CONTAINER_NAME: ${{ vars.YOLO_STORAGE_CONTAINER_NAME || 'yolo-training' }}
   STORAGE_PREFIX: ${{ vars.YOLO_STORAGE_PREFIX || 'continuous-training' }}
-  AML_DATASTORE_NAME: ${{ vars.YOLO_AML_DATASTORE_NAME || 'yolo-continuous-training' }}
+  AML_DATASTORE_NAME: ${{ vars.YOLO_AML_DATASTORE_NAME || 'yolo_continuous_training' }}
   DATA_ASSET_NAME: ${{ vars.YOLO_DATA_ASSET_NAME || 'yolo-training-data' }}
   MODEL_NAME: ${{ vars.YOLO_MODEL_NAME || 'yolo-detector' }}
   TEST_MODEL_NAME: ${{ vars.YOLO_TEST_MODEL_NAME || '' }}

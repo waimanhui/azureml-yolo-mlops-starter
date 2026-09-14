@@ -1,5 +1,5 @@
 $schema: https://azuremlschemas.azureedge.net/latest/azureBlob.schema.json
 type: azure_blob
-name: yolo-continuous-training
+name: yolo_continuous_training
 account_name: replace-at-deployment
 container_name: yolo-training
