@@ -26,6 +26,7 @@ def init() -> None:
 
 def run(mini_batch: list[str]) -> list[str]:
     output = []
+    failures = []
     for image_path in mini_batch:
         try:
             result = model.predict(image_path, verbose=False)[0]
@@ -51,10 +52,13 @@ def run(mini_batch: list[str]) -> list[str]:
                 "detections": detections,
             }
         except Exception as error:
+            failures.append(f"{Path(image_path).name}: {error}")
             record = {
                 "image": Path(image_path).name,
                 "status": "error",
                 "error": str(error),
             }
         output.append(json.dumps(record))
+    if failures and len(failures) == len(mini_batch):
+        raise RuntimeError("All images failed inference: " + "; ".join(failures))
     return output

@@ -44,12 +44,17 @@ az extension add \
   --upgrade \
   --yes
 
-az ml model show \
+model_lineage=$(az ml model show \
   --name "$MODEL_NAME" \
   --version "$MODEL_VERSION" \
   "${common_args[@]}" \
-  --only-show-errors \
-  --output none
+  --query "[tags.source_job, tags.training_data, tags.training_profile]" \
+  --output tsv)
+IFS=$'\t' read -r source_job training_data training_profile <<< "$model_lineage"
+if [[ -z "$source_job" || -z "$training_data" || "$training_profile" != "production" ]]; then
+  echo "$MODEL_NAME:$MODEL_VERSION is missing verified production lineage tags" >&2
+  exit 1
+fi
 
 if ! az ml batch-endpoint show \
   --name "$BATCH_ENDPOINT_NAME" \

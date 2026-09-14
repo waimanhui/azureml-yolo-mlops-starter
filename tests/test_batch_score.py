@@ -7,7 +7,8 @@ import pytest
 
 sys.modules.setdefault("ultralytics", types.SimpleNamespace(YOLO=object))
 
-find_model_path = importlib.import_module("src.batch_score").find_model_path
+batch_score = importlib.import_module("src.batch_score")
+find_model_path = batch_score.find_model_path
 
 
 def test_find_model_path_prefers_stable_artifact(tmp_path: Path) -> None:
@@ -34,3 +35,15 @@ def test_find_model_path_rejects_ambiguous_artifacts(tmp_path: Path) -> None:
 def test_find_model_path_requires_artifact(tmp_path: Path) -> None:
     with pytest.raises(FileNotFoundError, match="No model.pt or best.pt"):
         find_model_path(tmp_path)
+
+
+def test_run_raises_when_every_image_fails(monkeypatch) -> None:
+    failing_model = types.SimpleNamespace(
+        predict=lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            RuntimeError("inference unavailable")
+        )
+    )
+    monkeypatch.setattr(batch_score, "model", failing_model, raising=False)
+
+    with pytest.raises(RuntimeError, match="All images failed inference"):
+        batch_score.run(["one.jpg", "two.jpg"])

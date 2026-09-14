@@ -11,8 +11,12 @@ inputs:
     type: uri_folder
     path: azureml:yolo-training-data:1
     mode: download
+  expected_train_images: 0
+  expected_val_images: 0
 command: >-
   python src/validate_dataset.py
   --data ${{inputs.training_data}}/data.yaml
+  --expected-train-images ${{inputs.expected_train_images}}
+  --expected-val-images ${{inputs.expected_val_images}}
 limits:
   timeout: 1800

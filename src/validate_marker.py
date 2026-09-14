@@ -7,7 +7,7 @@ from pathlib import Path, PurePosixPath
 SAFE_DATASET_PATH = re.compile(r"^[A-Za-z0-9._/-]+$")
 
 
-def validate_marker(marker_file: Path, marker_name: str) -> tuple[int, str]:
+def validate_marker(marker_file: Path, marker_name: str) -> tuple[int, str, int, int]:
     manifest = json.loads(marker_file.read_text(encoding="utf-8"))
     required_fields = {
         "schema_version",
@@ -56,7 +56,12 @@ def validate_marker(marker_file: Path, marker_name: str) -> tuple[int, str]:
     if created_at.tzinfo is None:
         raise ValueError("created_at must include a timezone")
 
-    return dataset_version, str(dataset_path)
+    return (
+        dataset_version,
+        str(dataset_path),
+        manifest["training_image_count"],
+        manifest["validation_image_count"],
+    )
 
 
 def main() -> None:
@@ -64,11 +69,13 @@ def main() -> None:
     parser.add_argument("marker_file", type=Path)
     parser.add_argument("marker_name")
     args = parser.parse_args()
-    dataset_version, dataset_path = validate_marker(
-        args.marker_file, args.marker_name
+    dataset_version, dataset_path, training_count, validation_count = (
+        validate_marker(args.marker_file, args.marker_name)
     )
     print(dataset_version)
     print(dataset_path)
+    print(training_count)
+    print(validation_count)
 
 
 if __name__ == "__main__":

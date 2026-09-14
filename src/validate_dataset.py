@@ -1,9 +1,11 @@
 import argparse
+import hashlib
 import json
 import math
 from pathlib import Path
 
 import yaml
+from PIL import Image, UnidentifiedImageError
 
 IMAGE_SUFFIXES = {".bmp", ".jpeg", ".jpg", ".png", ".tif", ".tiff", ".webp"}
 
@@ -11,6 +13,8 @@ IMAGE_SUFFIXES = {".bmp", ".jpeg", ".jpg", ".png", ".tif", ".tiff", ".webp"}
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Validate a YOLO dataset contract")
     parser.add_argument("--data", required=True, type=Path)
+    parser.add_argument("--expected-train-images", type=int, default=0)
+    parser.add_argument("--expected-val-images", type=int, default=0)
     return parser.parse_args()
 
 
@@ -19,11 +23,23 @@ def resolve_split(data_yaml: Path, config: dict, split_name: str) -> Path:
     if not isinstance(split_value, str):
         raise ValueError(f"{split_name} must be one relative folder path")
     configured_root = Path(config.get("path", "."))
-    if configured_root.is_absolute():
-        dataset_root = configured_root
-    else:
-        dataset_root = data_yaml.parent / configured_root
-    return (dataset_root / split_value).resolve()
+    split_path = Path(split_value)
+    if configured_root.is_absolute() or split_path.is_absolute():
+        raise ValueError("Dataset root and split paths must be relative")
+    yaml_root = data_yaml.parent.resolve()
+    resolved_path = (yaml_root / configured_root / split_path).resolve()
+    if resolved_path != yaml_root and yaml_root not in resolved_path.parents:
+        raise ValueError(f"{split_name} resolves outside the dataset root")
+    return resolved_path
+
+
+def image_digest(image_path: Path) -> str:
+    try:
+        with Image.open(image_path) as image:
+            image.verify()
+    except (OSError, UnidentifiedImageError) as error:
+        raise ValueError(f"Invalid image file: {image_path}") from error
+    return hashlib.sha256(image_path.read_bytes()).hexdigest()
 
 
 def validate_label(label_path: Path, class_count: int) -> int:
@@ -79,7 +95,7 @@ def validate_dataset(data_yaml: Path) -> dict[str, int]:
     class_count = len(names)
 
     summary = {"classes": class_count, "images": 0, "objects": 0}
-    split_names: dict[str, set[str]] = {}
+    split_digests: dict[str, set[str]] = {}
     for split_name in ("train", "val"):
         image_dir = resolve_split(data_yaml, config, split_name)
         if not image_dir.is_dir():
@@ -91,7 +107,7 @@ def validate_dataset(data_yaml: Path) -> dict[str, int]:
         )
         if not image_paths:
             raise ValueError(f"No images found for {split_name}")
-        split_names[split_name] = {path.name.casefold() for path in image_paths}
+        split_digests[split_name] = {image_digest(path) for path in image_paths}
 
         try:
             images_index = image_dir.parts.index("images")
@@ -113,14 +129,32 @@ def validate_dataset(data_yaml: Path) -> dict[str, int]:
         summary["images"] += len(image_paths)
         summary[f"{split_name}_images"] = len(image_paths)
 
-    overlap = split_names["train"] & split_names["val"]
+    overlap = split_digests["train"] & split_digests["val"]
     if overlap:
-        raise ValueError(f"Train and validation splits overlap: {sorted(overlap)[:5]}")
+        raise ValueError("Train and validation splits contain duplicate images")
     return summary
 
 
+def validate_expected_counts(
+    summary: dict[str, int], expected_train_images: int, expected_val_images: int
+) -> None:
+    expected_counts = {
+        "train_images": expected_train_images,
+        "val_images": expected_val_images,
+    }
+    for field_name, expected_count in expected_counts.items():
+        if expected_count > 0 and summary[field_name] != expected_count:
+            raise ValueError(
+                f"{field_name} is {summary[field_name]}, expected {expected_count}"
+            )
+
+
 def main() -> None:
-    summary = validate_dataset(parse_args().data)
+    args = parse_args()
+    summary = validate_dataset(args.data)
+    validate_expected_counts(
+        summary, args.expected_train_images, args.expected_val_images
+    )
     print(json.dumps(summary, sort_keys=True))
 
 

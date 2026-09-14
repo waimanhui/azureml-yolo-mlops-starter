@@ -24,13 +24,14 @@ env:
   AZURE_ML_EXTENSION_VERSION: ${{ vars.AZURE_ML_EXTENSION_VERSION }}
   MODEL_NAME: ${{ vars.YOLO_MODEL_NAME || 'yolo-detector' }}
   BASE_MODEL: ${{ vars.YOLO_BASE_MODEL || 'yolo11n.pt' }}
+  CPU_COMPUTE_NAME: ${{ vars.YOLO_CPU_COMPUTE_NAME || 'yolo-batch-cpu' }}
   TRAIN_COMPUTE_NAME: ${{ vars.YOLO_GPU_COMPUTE_NAME || 'yolo-gpu-cluster' }}
 
 jobs:
   train:
     name: Train and register candidate
     runs-on: ubuntu-latest
-    timeout-minutes: 360
+    timeout-minutes: 420
     environment: training
     steps:
       - name: Check out repository

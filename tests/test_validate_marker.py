@@ -28,7 +28,7 @@ def test_validate_marker_returns_version_and_path(tmp_path: Path) -> None:
         marker_file, "customer/project/version-003/_READY.json"
     )
 
-    assert result == (3, "customer/project/version-003")
+    assert result == (3, "customer/project/version-003", 75, 26)
 
 
 @pytest.mark.parametrize(

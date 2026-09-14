@@ -47,7 +47,7 @@ flowchart LR
 |   |-- compute/       # Scale-to-zero CPU and GPU clusters
 |   |-- datastores/    # Identity-based continuous-training storage
 |   |-- endpoints/     # Batch endpoint and deployment
-|   `-- jobs/          # Smoke and production training jobs
+|   `-- jobs/          # Validation, smoke, test, and production jobs
 |-- infra/             # Azure RBAC and Blob container Bicep
 |-- scripts/           # Reusable Azure ML workflow operations
 |-- src/               # Training and scoring entry points
@@ -199,8 +199,8 @@ workflow runs these checks automatically for pushes and pull requests:
 
 ```powershell
 python -m pytest -q
-python -m compileall -q src tests
-ruff check src tests
+python -m compileall -q src scripts tests
+ruff check src scripts tests
 python -c "import pathlib,yaml; [yaml.safe_load(p.read_text()) for p in pathlib.Path('.').rglob('*.yml')]; print('YAML OK')"
 ```
 
@@ -263,8 +263,9 @@ After configuring the GitHub variables in section 7, run the same managed test
 through GitHub Actions:
 
 ```powershell
-gh workflow run smoke-test.yml --ref main
-gh run watch --workflow smoke-test.yml --exit-status
+$runUrl = gh workflow run smoke-test.yml --ref main
+$runId = Split-Path $runUrl -Leaf
+gh run watch $runId --exit-status
 ```
 
 The workflow uses the `training` environment and OIDC identity, submits the job
@@ -277,7 +278,7 @@ az ml model create `
   --name yolo-detector `
   --type custom_model `
   --path "azureml://jobs/$job/outputs/model_output/paths/model.pt" `
-  --set tags.source_job=$job tags.purpose=smoke-test
+  --tags source_job=$job purpose=smoke-test training_profile=smoke
 ```
 
 The smoke job has a one-hour Azure-side timeout. If you use an Azure ML compute
@@ -304,13 +305,16 @@ by `class_id x_center y_center width height`; coordinates range from 0 to 1.
 Example `data.yaml`:
 
 ```yaml
-path: .
 train: images/train
 val: images/val
 names:
   0: product
   1: damaged-product
 ```
+
+Keep `train` and `val` relative to `data.yaml`. Omit `path` for portable Azure
+ML assets: older Ultralytics releases resolve an explicit relative `path`
+against their global datasets directory instead of the downloaded asset root.
 
 Before upload, verify matching image/label files, valid class IDs and bounding
 boxes, and no overlap between training and validation images.
@@ -342,8 +346,15 @@ Never overwrite the storage contents behind an existing data version.
 
 ## 5. Train and register
 
-The manifest intentionally pins data version `1` as a safe placeholder. Override
-it explicitly for each run:
+The manifest intentionally pins data version `1` as a placeholder. For normal
+operation, use **Retrain YOLO**, which validates the selected asset on CPU before
+starting the GPU and registers model lineage tags:
+
+```powershell
+gh workflow run retrain.yml --ref main --field data_asset="yolo-training-data:2"
+```
+
+To submit the underlying job manually, override the data version explicitly:
 
 ```powershell
 $dataVersion = 1
@@ -367,8 +378,43 @@ az ml model create `
   --name yolo-detector `
   --type custom_model `
   --path "azureml://jobs/$job/outputs/model_output/paths/model.pt" `
-  --set tags.source_job=$job tags.training_data="yolo-training-data:$dataVersion"
+  --tags source_job=$job `
+         training_data="yolo-training-data:$dataVersion" `
+         training_profile=production
 ```
+
+### Verified production baseline
+
+The repository was verified on September 14, 2026 with these immutable assets:
+
+| Resource | Verified value |
+| --- | --- |
+| Data | `yolo-training-data:2` |
+| Job | `yolo-train-34812685930-1-manual` |
+| Model | `yolo-detector:2` |
+
+Download the registered best checkpoint:
+
+```powershell
+az ml model download `
+  --name yolo-detector `
+  --version 2 `
+  --download-path downloaded-model
+```
+
+Download logs, `results.csv`, TensorBoard events, and both `best.pt` and
+`last.pt` from the completed job:
+
+```powershell
+az ml job download `
+  --name yolo-train-34812685930-1-manual `
+  --all `
+  --download-path downloaded-run
+```
+
+The final epoch recorded precision `0.62422`, recall `0.66532`, mAP50
+`0.69980`, and mAP50-95 `0.54658`. The best mAP50-95 was `0.66623` at epoch 1,
+so the registered `model.pt` is the best checkpoint rather than the final one.
 
 The production job timeout is six hours (`21600` seconds), configured with
 [`limits.timeout`](https://learn.microsoft.com/azure/machine-learning/reference-yaml-job-command#yaml-syntax)
@@ -464,11 +510,11 @@ The seven workflows are related, but they are not a seven-step sequence:
 | Workflow | Role | Trigger | When to run | Depends on |
 | --- | --- | --- | --- | --- |
 | **Validate Starter** | CI | Push, pull request, or manual | On every code change | Nothing in Azure |
-| **Set Up Continuous Training** | Infrastructure bootstrap | Manual | Once, then after infrastructure changes | OIDC identity, repository variables, existing workspace, storage account, and CPU compute |
+| **Set Up Continuous Training** | Infrastructure bootstrap | Manual | Once, then after infrastructure changes | OIDC identity, repository variables, existing workspace, storage account, CPU compute, and GPU compute |
 | **Run Azure ML Smoke Test** | Managed integration test | Manual | Before more expensive training changes | OIDC, CPU compute, and setup-provisioned storage access |
 | **Simulate Continuous Dataset Arrivals** | Test-data producer | Manual | Only when demonstrating continuous training | Setup and storage reachable from the runner |
 | **Process Continuous Training Batches** | Continuous-training orchestrator | Every six hours or manual | After real or simulated `_READY.json` markers arrive | Setup, reachable storage, and CPU compute; production mode also needs GPU compute |
-| **Retrain YOLO** | Direct manual training alternative | Manual | When a reviewed Azure ML data asset already exists | OIDC, the selected data asset, and GPU compute |
+| **Retrain YOLO** | Direct manual training alternative | Manual | When a reviewed Azure ML data asset already exists | OIDC, the selected data asset, CPU validation compute, and GPU compute |
 | **Deploy YOLO Batch Model** | Production CD | Manual | After reviewing and approving a production model version | OIDC, approved registered model, CPU batch compute, and production approval |
 
 For a low-cost first verification, run **Validate Starter**, run **Set Up
@@ -487,7 +533,8 @@ training workflows are alternatives, not consecutive requirements.
 
 The **Retrain YOLO** workflow requires an explicit `name:version` data asset.
 The **Deploy YOLO Batch Model** workflow requires an approved numeric model
-version and safely updates an existing deployment when rerun.
+version with persisted production lineage tags and safely updates an existing
+deployment when rerun.
 
 The workflows are intentionally thin. Azure operations live in
 `scripts/retrain.sh` and `scripts/deploy-batch.sh`, allowing the same commands to
@@ -497,6 +544,7 @@ be reviewed and tested outside GitHub Actions. Production safeguards include:
 - Readable major-version tags for maintained GitHub Actions.
 - A pinned Azure ML CLI extension version supplied by configuration.
 - Input validation and Azure-side checks that the selected data or model exists.
+- CPU dataset validation before either direct or continuous production training.
 - Six-hour training and one-hour deployment timeouts.
 - Concurrency controls that serialize production deployments and prevent two
   runs for the same data version from executing simultaneously.
@@ -531,6 +579,7 @@ The continuous-training path uses existing Azure ML and storage accounts plus:
 - AzureML Data Scientist for that identity on the workspace.
 - Storage Blob Data Reader for the workspace managed identity.
 - Storage Blob Data Contributor for the CPU compute managed identity.
+- Storage Blob Data Contributor for the GPU compute managed identity.
 - A scale-to-zero CPU validation job before GPU training.
 
 Run **Set Up Continuous Training** once from GitHub Actions. It deploys
@@ -636,7 +685,9 @@ az ml model list `
   --output table
 ```
 
-A manual run can raise `max_batches`, but all processing remains serialized.
+A manual test-profile run can raise `max_batches`, but all processing remains
+serialized. Production processing is limited to one batch per workflow run so
+the GitHub timeout remains longer than the Azure training timeout.
 GitHub schedule execution may be delayed; use Event Grid and an Azure Function
 with the same marker contract if near-real-time triggering becomes a requirement.
 
@@ -670,6 +721,12 @@ below as the planning baseline:
 
 > **Estimated run cost** = node count x billable hours x regional VM rate,
 > plus storage and network charges.
+
+The Azure ML job duration is not the billed VM duration. Billing can also cover
+node allocation, environment preparation, the configured idle scale-down
+period, and deallocation. Use **Azure Cost Management > Cost analysis**, scope
+it to the resource group, select **Actual cost**, and group by the VM meter for
+the authoritative amount after billing data is ingested.
 
 Use these controls from the beginning:
 

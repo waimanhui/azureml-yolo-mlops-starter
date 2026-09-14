@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Maintainable Azure Machine Learning YOLO training and batch inference starter"
 requires-python = ">=3.10,<3.13"
 dependencies = [
+    "pillow>=10,<13",
     "pyyaml>=6,<7",
     "ultralytics>=8.4,<9",
 ]

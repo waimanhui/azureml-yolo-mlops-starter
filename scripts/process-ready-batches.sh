@@ -36,6 +36,10 @@ case "$training_profile" in
     train_compute_name="$cpu_compute_name"
     ;;
   production)
+    if (( max_batches > 1 )); then
+      echo "Production processing supports one batch per workflow run" >&2
+      exit 1
+    fi
     train_job_file="azureml/jobs/train.yml"
     train_compute_name="$gpu_compute_name"
     ;;
@@ -87,14 +91,16 @@ for marker_name in "${markers[@]}"; do
     --only-show-errors \
     --output none
 
-    mapfile -t marker_values < <(
+  mapfile -t marker_values < <(
     python src/validate_marker.py "$marker_file" "$marker_name"
-    )
+  )
   rm -f "$marker_file"
   trap - EXIT
 
   dataset_version="${marker_values[0]}"
   dataset_path="${marker_values[1]}"
+  expected_train_images="${marker_values[2]}"
+  expected_val_images="${marker_values[3]}"
   data_asset="$DATA_ASSET_NAME:$dataset_version"
   if [[ "$training_profile" == "test" ]]; then
     run_model_name="$test_model_name"
@@ -102,22 +108,33 @@ for marker_name in "${markers[@]}"; do
     run_model_name="$base_model_name"
   fi
 
-  existing_model=$(az ml model list \
-    --name "$run_model_name" \
-    "${common_args[@]}" \
-    --query "[?tags.training_data=='$data_asset' && tags.training_profile=='$training_profile'].version | [0]" \
-    --output tsv 2>/dev/null || true)
+  if ! existing_model=$(az ml model list \
+      --name "$run_model_name" \
+      "${common_args[@]}" \
+      --query "[?tags.training_data=='$data_asset' && tags.training_profile=='$training_profile'].version | [0]" \
+      --output tsv); then
+    echo "Unable to check whether $data_asset was already trained" >&2
+    exit 1
+  fi
   if [[ -n "$existing_model" ]]; then
     echo "Skipping $data_asset; $run_model_name:$existing_model already uses it"
     continue
   fi
 
-  if ! az ml data show \
+  expected_data_path="azureml://datastores/$AML_DATASTORE_NAME/paths/$dataset_path"
+  expected_data_suffix="/datastores/$AML_DATASTORE_NAME/paths/$dataset_path"
+  if existing_data_path=$(az ml data show \
     --name "$DATA_ASSET_NAME" \
     --version "$dataset_version" \
     "${common_args[@]}" \
-    --only-show-errors \
-    --output none 2>/dev/null; then
+    --query path \
+    --output tsv 2>/dev/null); then
+    normalized_data_path="/${existing_data_path%/}"
+    if [[ "$normalized_data_path" != *"$expected_data_suffix" ]]; then
+      echo "$data_asset points to $existing_data_path, expected $expected_data_path" >&2
+      exit 1
+    fi
+  else
     az ml data create \
       --name "$DATA_ASSET_NAME" \
       --version "$dataset_version" \
@@ -134,6 +151,8 @@ for marker_name in "${markers[@]}"; do
     --file azureml/jobs/validate-data.yml \
     --name "$validation_job" \
     --set inputs.training_data.path="azureml:$data_asset" \
+      inputs.expected_train_images="$expected_train_images" \
+      inputs.expected_val_images="$expected_val_images" \
       compute="azureml:$cpu_compute_name" \
       tags.training_data="$data_asset" \
       tags.trigger=ready-marker \
@@ -158,6 +177,7 @@ for marker_name in "${markers[@]}"; do
   export TRAIN_JOB_FILE="$train_job_file"
   export BASE_MODEL="$base_model"
   export TRAIN_COMPUTE_NAME="$train_compute_name"
+  export SKIP_DATA_VALIDATION="true"
   bash scripts/retrain.sh
   processed_count=$((processed_count + 1))
   if (( processed_count >= max_batches )); then
