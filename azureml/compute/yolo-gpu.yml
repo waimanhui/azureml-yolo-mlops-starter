@@ -1,7 +1,9 @@
 $schema: https://azuremlschemas.azureedge.net/latest/amlCompute.schema.json
 name: yolo-gpu-cluster
 type: amlcompute
-size: Standard_NC4as_T4_v3
+size: Standard_NV12s_v3
+identity:
+  type: system_assigned
 min_instances: 0
 max_instances: 1
 idle_time_before_scale_down: 120

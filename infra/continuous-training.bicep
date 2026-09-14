@@ -15,6 +15,9 @@ param githubPrincipalId string
 @description('Existing Azure Machine Learning CPU compute cluster name.')
 param cpuComputeName string
 
+@description('Existing Azure Machine Learning GPU compute cluster name.')
+param gpuComputeName string
+
 resource workspace 'Microsoft.MachineLearningServices/workspaces@2024-04-01' existing = {
   name: workspaceName
 }
@@ -22,6 +25,11 @@ resource workspace 'Microsoft.MachineLearningServices/workspaces@2024-04-01' exi
 resource cpuCompute 'Microsoft.MachineLearningServices/workspaces/computes@2024-04-01' existing = {
   parent: workspace
   name: cpuComputeName
+}
+
+resource gpuCompute 'Microsoft.MachineLearningServices/workspaces/computes@2024-04-01' existing = {
+  parent: workspace
+  name: gpuComputeName
 }
 
 resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' existing = {
@@ -94,6 +102,17 @@ resource computeStorageRole 'Microsoft.Authorization/roleAssignments@2022-04-01'
   }
 }
 
+resource gpuComputeStorageRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(storageAccount.id, gpuCompute.id, storageBlobDataContributorRoleId)
+  scope: storageAccount
+  properties: {
+    principalId: gpuCompute.identity.principalId
+    principalType: 'ServicePrincipal'
+    roleDefinitionId: storageBlobDataContributorRoleId
+  }
+}
+
 output containerResourceId string = trainingContainer.id
 output workspacePrincipalId string = workspace.identity.principalId
 output computePrincipalId string = cpuCompute.identity.principalId
+output gpuComputePrincipalId string = gpuCompute.identity.principalId

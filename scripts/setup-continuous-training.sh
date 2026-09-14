@@ -10,6 +10,7 @@ required_variables=(
   STORAGE_CONTAINER_NAME
   AML_DATASTORE_NAME
   CPU_COMPUTE_NAME
+  GPU_COMPUTE_NAME
 )
 for variable_name in "${required_variables[@]}"; do
   if [[ -z "${!variable_name:-}" ]]; then
@@ -34,6 +35,7 @@ az deployment group create \
     containerName="$STORAGE_CONTAINER_NAME" \
     githubPrincipalId="$AZURE_CLIENT_OBJECT_ID" \
     cpuComputeName="$CPU_COMPUTE_NAME" \
+    gpuComputeName="$GPU_COMPUTE_NAME" \
   --only-show-errors \
   --output none
 
