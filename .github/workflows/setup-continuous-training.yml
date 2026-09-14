@@ -20,6 +20,7 @@ env:
   STORAGE_ACCOUNT_NAME: ${{ vars.YOLO_STORAGE_ACCOUNT_NAME }}
   STORAGE_CONTAINER_NAME: ${{ vars.YOLO_STORAGE_CONTAINER_NAME || 'yolo-training' }}
   AML_DATASTORE_NAME: ${{ vars.YOLO_AML_DATASTORE_NAME || 'yolo_continuous_training' }}
+  CPU_COMPUTE_NAME: ${{ vars.YOLO_CPU_COMPUTE_NAME || 'yolo-batch-cpu' }}
 
 jobs:
   setup:

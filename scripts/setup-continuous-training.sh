@@ -9,6 +9,7 @@ required_variables=(
   STORAGE_ACCOUNT_NAME
   STORAGE_CONTAINER_NAME
   AML_DATASTORE_NAME
+  CPU_COMPUTE_NAME
 )
 for variable_name in "${required_variables[@]}"; do
   if [[ -z "${!variable_name:-}" ]]; then
@@ -32,6 +33,7 @@ az deployment group create \
     storageAccountName="$STORAGE_ACCOUNT_NAME" \
     containerName="$STORAGE_CONTAINER_NAME" \
     githubPrincipalId="$AZURE_CLIENT_OBJECT_ID" \
+    cpuComputeName="$CPU_COMPUTE_NAME" \
   --only-show-errors \
   --output none
 

@@ -12,8 +12,16 @@ param containerName string = 'yolo-training'
 @description('Object ID of the GitHub OIDC service principal, not its client ID.')
 param githubPrincipalId string
 
+@description('Existing Azure Machine Learning CPU compute cluster name.')
+param cpuComputeName string
+
 resource workspace 'Microsoft.MachineLearningServices/workspaces@2024-04-01' existing = {
   name: workspaceName
+}
+
+resource cpuCompute 'Microsoft.MachineLearningServices/workspaces/computes@2024-04-01' existing = {
+  parent: workspace
+  name: cpuComputeName
 }
 
 resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' existing = {
@@ -76,5 +84,16 @@ resource workspaceStorageRole 'Microsoft.Authorization/roleAssignments@2022-04-0
   }
 }
 
+resource computeStorageRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(storageAccount.id, cpuCompute.id, storageBlobDataContributorRoleId)
+  scope: storageAccount
+  properties: {
+    principalId: cpuCompute.identity.principalId
+    principalType: 'ServicePrincipal'
+    roleDefinitionId: storageBlobDataContributorRoleId
+  }
+}
+
 output containerResourceId string = trainingContainer.id
 output workspacePrincipalId string = workspace.identity.principalId
+output computePrincipalId string = cpuCompute.identity.principalId
