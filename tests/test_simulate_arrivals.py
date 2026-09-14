@@ -56,6 +56,7 @@ def test_snapshots_are_cumulative_with_fixed_validation(tmp_path: Path) -> None:
     data_yaml = yaml.safe_load(
         (snapshots[-1] / "data.yaml").read_text(encoding="utf-8")
     )
+    assert "path" not in data_yaml
     assert data_yaml["train"] == "images/train"
     assert data_yaml["val"] == "images/val"
     assert data_yaml["names"] == {0: "object"}

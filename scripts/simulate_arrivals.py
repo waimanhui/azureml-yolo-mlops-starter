@@ -166,7 +166,6 @@ def create_snapshots(
         (snapshot_dir / "data.yaml").write_text(
             yaml.safe_dump(
                 {
-                    "path": ".",
                     "train": "images/train",
                     "val": "images/val",
                     "names": names,
