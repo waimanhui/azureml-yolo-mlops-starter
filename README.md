@@ -668,11 +668,8 @@ Pricing varies by region and agreement, so estimate with the Azure Pricing
 Calculator using your selected VM sizes and expected runtime. Treat the formula
 below as the planning baseline:
 
-$$
-\text{run cost} \approx
-\text{node count} \times \text{billable hours} \times \text{regional VM rate}
-+ \text{storage and network charges}
-$$
+> **Estimated run cost** = node count x billable hours x regional VM rate
+> + storage and network charges
 
 Use these controls from the beginning:
 
