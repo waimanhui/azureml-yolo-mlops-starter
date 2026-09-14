@@ -1,0 +1,38 @@
+__pycache__/
+*.py[cod]
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.env
+.env.*
+.mypy_cache/
+.ipynb_checkpoints/
+.venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+build/
+dist/
+
+# Local data, generated results, and model artifacts
+data/
+dataset/
+inference-images/
+notebook-output/
+outputs/
+runs/
+wandb/
+*_saved_model/
+*.engine
+*.onnx
+*.pt
+*.tflite
+*.torchscript
+
+# Local Azure ML configuration and downloads
+.azureml/
+azureml-logs/
+
+# Generated infrastructure output
+infra/continuous-training.json

@@ -1,0 +1,4 @@
+$schema: https://azuremlschemas.azureedge.net/latest/batchEndpoint.schema.json
+name: yolo-batch
+description: Batch object detection with the approved YOLO model.
+auth_mode: aad_token

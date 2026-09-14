@@ -1,0 +1,66 @@
+name: Retrain YOLO
+run-name: Retrain YOLO with ${{ inputs.data_asset }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      data_asset:
+        description: Azure ML data asset in name:version format
+        required: true
+        type: string
+
+concurrency:
+  group: yolo-training-${{ inputs.data_asset }}
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AZURE_CORE_ONLY_SHOW_ERRORS: "true"
+  AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+  AZURE_ML_WORKSPACE: ${{ vars.AZURE_ML_WORKSPACE }}
+  AZURE_ML_EXTENSION_VERSION: ${{ vars.AZURE_ML_EXTENSION_VERSION }}
+  MODEL_NAME: ${{ vars.YOLO_MODEL_NAME || 'yolo-detector' }}
+  BASE_MODEL: ${{ vars.YOLO_BASE_MODEL || 'yolo11n.pt' }}
+  TRAIN_COMPUTE_NAME: ${{ vars.YOLO_GPU_COMPUTE_NAME || 'yolo-gpu-cluster' }}
+
+jobs:
+  train:
+    name: Train and register candidate
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    environment: training
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Validate workflow configuration
+        shell: bash
+        env:
+          DATA_ASSET: ${{ inputs.data_asset }}
+        run: |
+          set -Eeuo pipefail
+          test -f azureml/jobs/train.yml
+          test -f scripts/retrain.sh
+          [[ "$DATA_ASSET" =~ ^[A-Za-z0-9_.-]+:[1-9][0-9]*$ ]]
+          test -n "$AZURE_RESOURCE_GROUP"
+          test -n "$AZURE_ML_WORKSPACE"
+          test -n "$AZURE_ML_EXTENSION_VERSION"
+
+      - name: Sign in to Azure with OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Submit and monitor training
+        id: training
+        shell: bash
+        env:
+          DATA_ASSET: ${{ inputs.data_asset }}
+        run: bash scripts/retrain.sh

@@ -1,0 +1,70 @@
+name: Process Continuous Training Batches
+run-name: Process up to ${{ inputs.max_batches || '1' }} ready batch(es)
+
+on:
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+    inputs:
+      max_batches:
+        description: Maximum new dataset versions to train in this run
+        required: true
+        default: "1"
+        type: string
+      training_profile:
+        description: Low-cost test or full production training settings
+        required: true
+        default: test
+        type: choice
+        options:
+          - test
+          - production
+
+concurrency:
+  group: yolo-continuous-training
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AZURE_CORE_ONLY_SHOW_ERRORS: "true"
+  AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+  AZURE_ML_WORKSPACE: ${{ vars.AZURE_ML_WORKSPACE }}
+  AZURE_ML_EXTENSION_VERSION: ${{ vars.AZURE_ML_EXTENSION_VERSION }}
+  STORAGE_ACCOUNT_NAME: ${{ vars.YOLO_STORAGE_ACCOUNT_NAME }}
+  STORAGE_CONTAINER_NAME: ${{ vars.YOLO_STORAGE_CONTAINER_NAME || 'yolo-training' }}
+  STORAGE_PREFIX: ${{ vars.YOLO_STORAGE_PREFIX || 'continuous-training' }}
+  AML_DATASTORE_NAME: ${{ vars.YOLO_AML_DATASTORE_NAME || 'yolo-continuous-training' }}
+  DATA_ASSET_NAME: ${{ vars.YOLO_DATA_ASSET_NAME || 'yolo-training-data' }}
+  MODEL_NAME: ${{ vars.YOLO_MODEL_NAME || 'yolo-detector' }}
+  TEST_MODEL_NAME: ${{ vars.YOLO_TEST_MODEL_NAME || '' }}
+  BASE_MODEL: ${{ vars.YOLO_BASE_MODEL || 'yolo11n.pt' }}
+  CPU_COMPUTE_NAME: ${{ vars.YOLO_CPU_COMPUTE_NAME || 'yolo-batch-cpu' }}
+  GPU_COMPUTE_NAME: ${{ vars.YOLO_GPU_COMPUTE_NAME || 'yolo-gpu-cluster' }}
+  MAX_BATCHES_PER_RUN: ${{ inputs.max_batches || '1' }}
+  TRAINING_PROFILE: ${{ inputs.training_profile || 'production' }}
+
+jobs:
+  process:
+    name: Register and train ready batches
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    environment: training
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Sign in to Azure with OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Process ready dataset versions
+        shell: bash
+        run: bash scripts/process-ready-batches.sh

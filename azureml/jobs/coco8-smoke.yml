@@ -1,0 +1,28 @@
+$schema: https://azuremlschemas.azureedge.net/latest/commandJob.schema.json
+type: command
+display_name: yolo-coco8-smoke
+experiment_name: yolo-smoke
+compute: azureml:yolo-batch-cpu
+code: ../..
+environment:
+  image: ultralytics/ultralytics@sha256:6fe75a90a066a012916932db205dddba8069e8e213ec237e2e42569dbe2e5332
+inputs:
+  base_model: yolo11n.pt
+  epochs: 1
+  image_size: 320
+  batch_size: 4
+outputs:
+  model_output:
+    type: uri_folder
+    mode: upload
+command: >-
+  python src/train.py
+  --data coco8.yaml
+  --model ${{inputs.base_model}}
+  --epochs ${{inputs.epochs}}
+  --image-size ${{inputs.image_size}}
+  --batch-size ${{inputs.batch_size}}
+  --device cpu
+  --model-output ${{outputs.model_output}}
+limits:
+  timeout: 3600

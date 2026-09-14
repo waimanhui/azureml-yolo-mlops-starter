@@ -1,0 +1,45 @@
+name: Set Up Continuous Training
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: yolo-continuous-training-setup
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AZURE_CORE_ONLY_SHOW_ERRORS: "true"
+  AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+  AZURE_ML_WORKSPACE: ${{ vars.AZURE_ML_WORKSPACE }}
+  AZURE_ML_EXTENSION_VERSION: ${{ vars.AZURE_ML_EXTENSION_VERSION }}
+  AZURE_CLIENT_OBJECT_ID: ${{ vars.AZURE_CLIENT_OBJECT_ID }}
+  STORAGE_ACCOUNT_NAME: ${{ vars.YOLO_STORAGE_ACCOUNT_NAME }}
+  STORAGE_CONTAINER_NAME: ${{ vars.YOLO_STORAGE_CONTAINER_NAME || 'yolo-training' }}
+  AML_DATASTORE_NAME: ${{ vars.YOLO_AML_DATASTORE_NAME || 'yolo-continuous-training' }}
+
+jobs:
+  setup:
+    name: Provision continuous-training integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: infrastructure
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Sign in to Azure with OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Provision storage access and datastore
+        shell: bash
+        run: bash scripts/setup-continuous-training.sh

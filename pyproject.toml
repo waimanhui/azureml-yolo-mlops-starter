@@ -1,0 +1,29 @@
+[project]
+name = "azureml-yolo-mlops-starter"
+version = "0.1.0"
+description = "Maintainable Azure Machine Learning YOLO training and batch inference starter"
+requires-python = ">=3.10,<3.13"
+dependencies = [
+    "pyyaml>=6,<7",
+    "ultralytics>=8.4,<9",
+]
+
+[project.optional-dependencies]
+dev = [
+    "nbformat>=5,<6",
+    "pytest>=8,<9",
+    "ruff>=0.13,<1",
+]
+notebook = [
+    "ipykernel>=6,<8",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]

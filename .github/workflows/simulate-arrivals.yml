@@ -1,0 +1,72 @@
+name: Simulate Continuous Dataset Arrivals
+
+on:
+  workflow_dispatch:
+    inputs:
+      batch_count:
+        description: Number of cumulative dataset versions
+        required: true
+        default: "4"
+        type: string
+      batch_size:
+        description: New training images per version
+        required: true
+        default: "25"
+        type: string
+      validation_size:
+        description: Images held fixed for validation
+        required: true
+        default: "26"
+        type: string
+
+concurrency:
+  group: yolo-arrival-simulation
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AZURE_CORE_ONLY_SHOW_ERRORS: "true"
+  STORAGE_ACCOUNT_NAME: ${{ vars.YOLO_STORAGE_ACCOUNT_NAME }}
+  STORAGE_CONTAINER_NAME: ${{ vars.YOLO_STORAGE_CONTAINER_NAME || 'yolo-training' }}
+  STORAGE_PREFIX: ${{ vars.YOLO_STORAGE_PREFIX || 'continuous-training' }}
+
+jobs:
+  simulate:
+    name: Generate and upload COCO128 snapshots
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: training
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Sign in to Azure with OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Install simulator dependency
+        run: python -m pip install "pyyaml>=6,<7"
+
+      - name: Generate cumulative snapshots
+        env:
+          BATCH_COUNT: ${{ inputs.batch_count }}
+          BATCH_SIZE: ${{ inputs.batch_size }}
+          VALIDATION_SIZE: ${{ inputs.validation_size }}
+        run: |
+          python scripts/simulate_arrivals.py \
+            --batch-count "$BATCH_COUNT" \
+            --batch-size "$BATCH_SIZE" \
+            --validation-size "$VALIDATION_SIZE" \
+            --storage-prefix "$STORAGE_PREFIX"
+
+      - name: Upload payloads and publish markers
+        shell: bash
+        run: bash scripts/upload-arrivals.sh

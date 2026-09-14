@@ -1,0 +1,21 @@
+$schema: https://azuremlschemas.azureedge.net/latest/batchDeployment.schema.json
+name: candidate
+endpoint_name: yolo-batch
+model: azureml:yolo-detector:1
+compute: azureml:yolo-batch-cpu
+environment:
+  image: ultralytics/ultralytics@sha256:6fe75a90a066a012916932db205dddba8069e8e213ec237e2e42569dbe2e5332
+code_configuration:
+  code: ../..
+  scoring_script: src/batch_score.py
+resources:
+  instance_count: 1
+max_concurrency_per_instance: 1
+mini_batch_size: 16
+output_action: append_row
+output_file_name: predictions.jsonl
+error_threshold: 0
+retry_settings:
+  max_retries: 3
+  timeout: 300
+logging_level: info

@@ -1,0 +1,66 @@
+name: Deploy YOLO Batch Model
+run-name: Deploy YOLO model ${{ inputs.model_version }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      model_version:
+        description: Approved production model version
+        required: true
+        type: string
+
+concurrency:
+  group: yolo-production-deployment
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AZURE_CORE_ONLY_SHOW_ERRORS: "true"
+  AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+  AZURE_ML_WORKSPACE: ${{ vars.AZURE_ML_WORKSPACE }}
+  AZURE_ML_EXTENSION_VERSION: ${{ vars.AZURE_ML_EXTENSION_VERSION }}
+  MODEL_NAME: ${{ vars.YOLO_MODEL_NAME || 'yolo-detector' }}
+  BATCH_ENDPOINT_NAME: ${{ vars.YOLO_BATCH_ENDPOINT_NAME || 'yolo-batch' }}
+  BATCH_COMPUTE_NAME: ${{ vars.YOLO_CPU_COMPUTE_NAME || 'yolo-batch-cpu' }}
+
+jobs:
+  deploy:
+    name: Deploy approved model
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    environment: production
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Validate workflow configuration
+        shell: bash
+        env:
+          MODEL_VERSION: ${{ inputs.model_version }}
+        run: |
+          set -Eeuo pipefail
+          test -f azureml/endpoints/batch-endpoint.yml
+          test -f azureml/endpoints/batch-deployment.yml
+          test -f scripts/deploy-batch.sh
+          [[ "$MODEL_VERSION" =~ ^[1-9][0-9]*$ ]]
+          test -n "$AZURE_RESOURCE_GROUP"
+          test -n "$AZURE_ML_WORKSPACE"
+          test -n "$AZURE_ML_EXTENSION_VERSION"
+
+      - name: Sign in to Azure with OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Create endpoint and deploy approved model
+        shell: bash
+        env:
+          MODEL_VERSION: ${{ inputs.model_version }}
+        run: bash scripts/deploy-batch.sh
