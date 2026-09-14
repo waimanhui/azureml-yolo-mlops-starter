@@ -452,6 +452,34 @@ where the workflows that use them can access them:
 | `YOLO_GPU_COMPUTE_NAME` | Optional production training cluster; defaults to `yolo-gpu-cluster` |
 | `YOLO_BATCH_ENDPOINT_NAME` | Optional endpoint name; defaults to `yolo-batch` |
 
+### GitHub Actions workflow map
+
+The seven workflows are related, but they are not a seven-step sequence:
+
+| Workflow | Role | Trigger | When to run | Depends on |
+| --- | --- | --- | --- | --- |
+| **Validate Starter** | CI | Push, pull request, or manual | On every code change | Nothing in Azure |
+| **Set Up Continuous Training** | Infrastructure bootstrap | Manual | Once, then after infrastructure changes | OIDC identity, repository variables, existing workspace, storage account, and CPU compute |
+| **Run Azure ML Smoke Test** | Managed integration test | Manual | Before more expensive training changes | OIDC, CPU compute, and setup-provisioned storage access |
+| **Simulate Continuous Dataset Arrivals** | Test-data producer | Manual | Only when demonstrating continuous training | Setup and storage reachable from the runner |
+| **Process Continuous Training Batches** | Continuous-training orchestrator | Every six hours or manual | After real or simulated `_READY.json` markers arrive | Setup, reachable storage, and CPU compute; production mode also needs GPU compute |
+| **Retrain YOLO** | Direct manual training alternative | Manual | When a reviewed Azure ML data asset already exists | OIDC, the selected data asset, and GPU compute |
+| **Deploy YOLO Batch Model** | Production CD | Manual | After reviewing and approving a production model version | OIDC, approved registered model, CPU batch compute, and production approval |
+
+For a low-cost first verification, run **Validate Starter**, run **Set Up
+Continuous Training** once, and then run **Run Azure ML Smoke Test**. Stop there
+unless you want to test continuous arrivals or production release.
+
+For the continuous-training demonstration, run **Simulate Continuous Dataset
+Arrivals**, then manually run **Process Continuous Training Batches** with the
+`test` profile. The simulation and processor are not required for the standalone
+smoke test.
+
+For production, use either **Retrain YOLO** with an existing data asset or
+**Process Continuous Training Batches** with the `production` profile. Review
+the resulting production model, then run **Deploy YOLO Batch Model**. The two
+training workflows are alternatives, not consecutive requirements.
+
 The **Retrain YOLO** workflow requires an explicit `name:version` data asset.
 The **Deploy YOLO Batch Model** workflow requires an approved numeric model
 version and safely updates an existing deployment when rerun.
@@ -497,6 +525,7 @@ The continuous-training path uses existing Azure ML and storage accounts plus:
 - Storage Blob Data Contributor for the GitHub OIDC identity.
 - AzureML Data Scientist for that identity on the workspace.
 - Storage Blob Data Reader for the workspace managed identity.
+- Storage Blob Data Contributor for the CPU compute managed identity.
 - A scale-to-zero CPU validation job before GPU training.
 
 Run **Set Up Continuous Training** once from GitHub Actions. It deploys
