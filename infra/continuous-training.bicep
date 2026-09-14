@@ -51,7 +51,7 @@ var storageBlobDataReaderRoleId = subscriptionResourceId(
 )
 var azureMlDataScientistRoleId = subscriptionResourceId(
   'Microsoft.Authorization/roleDefinitions',
-  'f1a07417-d97a-45cb-824c-7a7467783830'
+  'f6c7c914-8db3-469d-8ca1-694a8f32e121'
 )
 
 resource githubStorageRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
