@@ -215,7 +215,7 @@ The checked-in defaults are:
 
 | Purpose | VM size | Nodes | Idle scale-down |
 | --- | --- | --- | --- |
-| CPU smoke and batch | `Standard_D4ads_v5` | 0-1 | 120 seconds |
+| CPU smoke and batch | `Standard_D2a_v4` | 0-1 | 120 seconds |
 | GPU training | `Standard_NC4as_T4_v3` | 0-1 | 120 seconds |
 
 Create only the CPU cluster first. The names below are defaults and can be
